@@ -44,6 +44,9 @@ for i in train_data:
         print("'{i}' is going to the categorical values".format(i=i))
         categorical_cols.append(i)
 
+categorical_cols= list(set(list(categorical_cols))-set(target_var))
+
+
 #creating a list with all the numerical columns 
 numerical_cols= list(set(list(train_data.columns))-set(categorical_cols)-set(ID)-set(target_var))
 
@@ -54,11 +57,9 @@ train_data[numerical_cols]=imp1.fit_transform(train_data[numerical_cols])
 #will do the same for categorical columns (without the if statement)
 #should I normalize the column LoanID???
 for col in train_data: 
-    a= False
     for i in numerical_cols:
-        if col==i:
-            a= True
-            train_data[col]= (train_data[col]- train_data[col].min())/(train_data[col].max()- train_data[col].min())
+        if i==col:
+            train_data[i]= (train_data[i]- train_data[i].min())/(train_data[i].max()- train_data[i].min())
 
 #imputing the most frequent value to missing values of the categorical columns
 imp2 = SimpleImputer(strategy="most_frequent")
