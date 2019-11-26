@@ -1,12 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Nov 11 10:58:13 2019
-
-@author: Pigi
-"""
-
-#clear everything up
-
 #importing libraries 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -20,13 +11,76 @@ from sklearn import preprocessing
 from pandas import Series,DataFrame
 from pylab import rcParams
 import seaborn as sb
-import scipy
-from scipy.stats import spearmanr
+import scipy 
 
 
+
+def encoding(df):
+
+    #seperating the name of the target variable and the LoanID variable
+    ID_name= df.columns[0]
+    target_name= df.columns[-1]
+    
+    #dropping all columns with missing value percentage > 50%
+    perc_mv= (df.isnull().sum())/len(df)*100
+    for i in df:
+        if perc_mv[i]>80: 
+           df.drop([i], axis=1, inplace= True)
+
+
+    #searching for all categorical columns ('object') and adding them to a list
+    categorical_cols= []
+    for i in df:
+        if i!=target_name:
+            if df[i].dtypes == 'object':
+                categorical_cols.append(i)
+
+
+    #creating a list with all the numerical columns 
+    numerical_cols= list(df.columns)
+    for i in df.columns:
+        if i in categorical_cols:
+            numerical_cols.remove(i)
+        if i== target_name:
+            numerical_cols.remove(i)   
+        if i== ID_name:
+            numerical_cols.remove(i)   
+
+    #imputing the mean to missing values of the numerical columns
+    imp1 = SimpleImputer(strategy="mean")
+    df[numerical_cols]=imp1.fit_transform(df[numerical_cols])    
+     
+    #normalizing all numerical data
+    for col in df: 
+        for i in numerical_cols:
+            if i==col:
+                df[i]= (df[i]- df[i].min())/(df[i].max()- df[i].min())
+
+    #imputing the most frequent value to missing values of the categorical columns
+    imp2 = SimpleImputer(strategy="most_frequent")
+    df[categorical_cols]=imp2.fit_transform(df[categorical_cols])     
+
+    # Create a set of dummy variables for the categorical features
+    for col_name in categorical_cols:
+        #top_10= the top 10 (most frequent) values for each categorical column
+        top_10=[x for x in df[col_name].value_counts().sort_values(ascending= False).head(10).index]
+        for categ in top_10:
+            #creating dummies for only the ten most frequent values
+            df[categ]= np.where(df[col_name]== categ, 1, 0)
+        df[[col_name]+ top_10].head(40)
+        df.drop(col_name, axis=1, inplace= True)
+   
+    # create correlation matrix
+    corr_matrix = df.corr().abs()
+    # select upper triangle of correlation matrix
+    upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
+    # Find index of feature columns with correlation greater than 0.95
+    to_drop = [column for column in upper.columns if any(upper[column] > 0.95)]
+    # Drop features 
+    df.drop(df[to_drop], axis=1)
+    return df
 
 def evaluate_classifier(X_train, X_test, y_train, y_test):
-
 
 #Import some classifiers to test from sklearn.svm 
     
@@ -44,18 +98,18 @@ def evaluate_classifier(X_train, X_test, y_train, y_test):
     # Fit the classifier
     classifier.fit(X_train, y_train)
     model = classifier.fit(X_train, y_train)
-    score = f1_score(y_test, classifier.predict(X_test), pos_label='Y')
+    score = f1_score(y_test, classifier.predict(X_test), pos_label=1)
     
     # Generate the P-R curve
     
     #y_prob = classifier.decision_function(X_test)
     y_prob = classifier.predict_proba(X_test)
     y_pred = model.predict(X_test)
-    precision, recall, _ = precision_recall_curve(y_test, y_prob[:,1], pos_label='Y')
+    precision, recall, _ = precision_recall_curve(y_test, y_prob[:,1], pos_label=1)
     # Include the score in the title
     yield 'Random forest (F1 score={:.3f})'.format(score), precision, recall
     # Generate the ROC curve for random forest
-    fpr_rt_lm, tpr_rt_lm, _ = roc_curve(y_test, y_prob[:,1], pos_label='Y')
+    fpr_rt_lm, tpr_rt_lm, _ = roc_curve(y_test, y_prob[:,1], pos_label=1)
     auc = roc_auc_score(y_test, y_prob[:,1])
     print('Random forest AUC: %.3f' % auc)
     print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
@@ -68,21 +122,25 @@ def evaluate_classifier(X_train, X_test, y_train, y_test):
     plt.title('ROC curve')
     plt.legend(loc='best')
 
-
     # testing the Ada boost classifier (another type of classifier, similar to AUC)
     classifier = AdaBoostClassifier(n_estimators=50, learning_rate=1.0, algorithm='SAMME.R')
    
     model = classifier.fit(X_train, y_train)
-    score = f1_score(y_test, classifier.predict(X_test), pos_label='Y')
+    score = f1_score(y_test, classifier.predict(X_test), pos_label=1)
     # P-R curve
     y_prob = classifier.decision_function(X_test)
-    print(y_prob)
     y_pred = model.predict(X_test)
+    #final= train_data
+   # for i in final:
+    #    if i!= ID_name:
+   #         final.drop([i], axis=1, inplace= True)
+    #final['Predictions']= y_pred
+    #print("Final")
+    #print(final)
     
-    
-    precision, recall, _ = precision_recall_curve(y_test, y_prob, pos_label='Y')
+    precision, recall, _ = precision_recall_curve(y_test, y_prob, pos_label=1)
     # generating the ROC curve for Ada metric
-    fpr_rt_lm, tpr_rt_lm, _ = roc_curve(y_test, y_prob, pos_label='Y')
+    fpr_rt_lm, tpr_rt_lm, _ = roc_curve(y_test, y_prob, pos_label=1)
     auc = roc_auc_score(y_test, y_prob)
     print('Ada boost AUC: %.3f' % auc)
     
@@ -121,7 +179,6 @@ def plot(results):
     plt.tight_layout()
 
 
-
     # ==================================
     # Display the plot in interactive UI
     plt.show()
@@ -145,72 +202,24 @@ def plot(results):
     # Closing the figure allows matplotlib to release the memory used.
     plt.close()
 
-
 # =====================================================================
 if __name__ == '__main__':
 
     #connecting to files
     train_data = pd.read_excel(r"C:\Users\Pigi\Desktop\Erasmus Semester Lessons\Data Mining\Project Assignment -AXA\Data_DSC2019_STUDENTS\DSC2019_Training.xlsx",  sheet_name='Sheet1')
     test_data= pd.read_excel(r"C:\Users\Pigi\Desktop\Erasmus Semester Lessons\Data Mining\Project Assignment -AXA\Data_DSC2019_STUDENTS\DSC2019_Test.xlsx",  sheet_name='Sheet1')
-
-
-    #finding out how many nulls does each column has
-    train_data.isnull().sum()
-
-    #distinguishing column values
-    ID= train_data.iloc[:,0]
-    target_var= train_data.iloc[:,-1]
-
-    #seperating the name of the target variable and the LoanID variable
-    ID_name= train_data.columns[0]
+            
     target_name= train_data.columns[-1]
-
-
-    #searching for all categorical columns ('object') and adding them to a list
-    categorical_cols= []
-    for i in train_data:
-        if train_data[i].dtypes == 'object':
-            if i!=target_name:
-                print("'{i}' is going to the categorical values".format(i=i))
-                categorical_cols.append(i)
-
-
-    #creating a list with all the numerical columns 
-    numerical_cols= list(train_data.columns)
-    for i in train_data.columns:
-        if i in categorical_cols:
-            numerical_cols.remove(i)
-        if i== target_name:
-            numerical_cols.remove(i)   
-        if i== ID_name:
-            numerical_cols.remove(i)   
-
-    #imputing the mean to missing values of the numerical columns
-    imp1 = SimpleImputer(strategy="mean")
-    train_data[numerical_cols]=imp1.fit_transform(train_data[numerical_cols])    
-     
-    #normalizing all numerical data
-    for col in train_data: 
-        for i in numerical_cols:
-            if i==col:
-                train_data[i]= (train_data[i]- train_data[i].min())/(train_data[i].max()- train_data[i].min())
-
-    #imputing the most frequent value to missing values of the categorical columns
-    imp2 = SimpleImputer(strategy="most_frequent")
-    train_data[categorical_cols]=imp2.fit_transform(train_data[categorical_cols])     
-
-    # Create a set of dummy variables for the categorical features
-    for col_name in categorical_cols:
-        #top_10= the top 10 (most frequent) values for each categorical column
-        top_10=[x for x in train_data[col_name].value_counts().sort_values(ascending= False).head(10).index]
-        for categ in top_10:
-            #creating dummies for only the ten most frequent values
-            train_data[categ]= np.where(train_data[col_name]== categ, 1, 0)
-        train_data[[col_name]+ top_10].head(40)
-        train_data.drop(col_name, axis=1, inplace= True)
+    #encoding the test and train set
+    train_data= encoding(train_data)
+    test_data= encoding(test_data)
+    
    
+    train_data[target_name]= np.where(train_data[target_name]== 'Y', 1, 0)
+    print("target column: '{i}'".format(i=train_data[target_name]))
 
-    print(train_data)
+    
+    #print(train_data)
    
     #separating the train and the test data
     Y= train_data[target_name].values
@@ -218,13 +227,15 @@ if __name__ == '__main__':
     print(X.shape)
     print(Y.shape)
     print(X)
-  
+      
     #I tried to make a validation set but the AUC went down, I will try again
     '''X_train, X_test, y_train, y_test = train_test_split(
     X, Y, test_size=0.2, random_state=1)
     X_train, X_val, y_train, y_val = train_test_split(
     X_train, y_train, test_size=0.25, random_state=1)'''
-    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.5, random_state=101)
+    #X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.5, random_state=101)
+    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=1)
+    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25, random_state=1)
     print(X_train.shape)
     print(y_train.shape)
     print(X_train)
@@ -236,14 +247,9 @@ if __name__ == '__main__':
     # Evaluate my_trainultiple classifiers on the data
     print("Evaluating classifiers")
     results = list(evaluate_classifier(X_train, X_test, y_train, y_test))
-
-        # Display the results
+    # Display the results
     print("Plotting the results")
     plot(results)
     
     #transferring to excel sheet 
     #I WILL FINISH WITH THIS TODAY
-
-
-
-
