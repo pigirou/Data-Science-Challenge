@@ -1,3 +1,12 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Nov 29 18:26:03 2019
+
+@author: Pigi
+"""
+
+#clear everything up
+
 #importing libraries 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -5,37 +14,42 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn import preprocessing
 from sklearn.impute import SimpleImputer
-from collections import Counter
-from sklearn import datasets
-from sklearn import preprocessing
-from pandas import Series,DataFrame
-from pylab import rcParams
-import seaborn as sb
-import scipy 
-
-
 
 def encoding(df):
 
     #seperating the name of the target variable and the LoanID variable
     ID_name= df.columns[0]
     target_name= df.columns[-1]
+
+        
+   #searching for all categorical columns ('object') and adding them to a list
     
-    #dropping all columns with missing value percentage > 50%
-    perc_mv= (df.isnull().sum())/len(df)*100
-    for i in df:
-        if perc_mv[i]>80: 
-           df.drop([i], axis=1, inplace= True)
-
-
-    #searching for all categorical columns ('object') and adding them to a list
     categorical_cols= []
     for i in df:
         if i!=target_name:
             if df[i].dtypes == 'object':
                 categorical_cols.append(i)
-
-
+                
+    for col_name in categorical_cols:
+        unique= len(train_data[col_name].unique())
+        print("'{i}' has '{u}' unique categories".format(i=col_name, u=unique))
+     
+    #imputing the most frequent value to missing values of the categorical columns
+    imp2 = SimpleImputer(strategy="most_frequent")
+    df[categorical_cols]=imp2.fit_transform(df[categorical_cols])
+    
+    cat_columns= []
+    for i in df:
+        if i!=target_name:
+            if df[i].dtypes == 'object':
+                df[i]=df[i].astype('category')
+                cat_columns.append(i)  
+                
+                
+    df[cat_columns] = df[cat_columns].apply(lambda x: x.cat.codes)
+    
+      
+   
     #creating a list with all the numerical columns 
     numerical_cols= list(df.columns)
     for i in df.columns:
@@ -48,27 +62,22 @@ def encoding(df):
 
     #imputing the mean to missing values of the numerical columns
     imp1 = SimpleImputer(strategy="mean")
-    df[numerical_cols]=imp1.fit_transform(df[numerical_cols])    
+    df[numerical_cols]=imp1.fit_transform(df[numerical_cols])  
+       
      
     #normalizing all numerical data
     for col in df: 
         for i in numerical_cols:
             if i==col:
                 df[i]= (df[i]- df[i].min())/(df[i].max()- df[i].min())
-
-    #imputing the most frequent value to missing values of the categorical columns
-    imp2 = SimpleImputer(strategy="most_frequent")
-    df[categorical_cols]=imp2.fit_transform(df[categorical_cols])     
-
-    # Create a set of dummy variables for the categorical features
-    for col_name in categorical_cols:
-        #top_10= the top 10 (most frequent) values for each categorical column
-        top_10=[x for x in df[col_name].value_counts().sort_values(ascending= False).head(10).index]
-        for categ in top_10:
-            #creating dummies for only the ten most frequent values
-            df[categ]= np.where(df[col_name]== categ, 1, 0)
-        df[[col_name]+ top_10].head(40)
-        df.drop(col_name, axis=1, inplace= True)
+                
+    for col in df: 
+        for i in categorical_cols:
+            if i==col:
+                df[i]= (df[i]- df[i].min())/(df[i].max()- df[i].min())
+    
+    print('df[cat_columns]')
+    print(df[cat_columns])
    
     # create correlation matrix
     corr_matrix = df.corr().abs()
@@ -76,11 +85,19 @@ def encoding(df):
     upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
     # Find index of feature columns with correlation greater than 0.95
     to_drop = [column for column in upper.columns if any(upper[column] > 0.95)]
+    print("High correlation columns")
+    print(to_drop)
     # Drop features 
-    df.drop(df[to_drop], axis=1)
+    #df.drop(df[to_drop], axis=1)
+    rs = np.random.RandomState(0)
+    corr_df = pd.DataFrame(rs.rand(10, 10))
+    correlation = corr_df.corr()
+    correlation.style.background_gradient(cmap='coolwarm')
+    print(correlation)
     return df
 
 def evaluate_classifier(X_train, X_test, y_train, y_test):
+
 
 #Import some classifiers to test from sklearn.svm 
     
@@ -91,78 +108,111 @@ def evaluate_classifier(X_train, X_test, y_train, y_test):
     # We will calculate the P-R curve for each classifier
     from sklearn.metrics import precision_recall_curve, f1_score, roc_curve, roc_auc_score
     from sklearn import metrics
+
     
-    
-    # testing the random forest classifier
+    # Here we create classifiers with default parameters. These need
+    # to be adjusted to obtain optimal performance on your data set.
+
+    # Test the random forest classifier
     classifier = RandomForestClassifier(n_estimators=1000)
     # Fit the classifier
     classifier.fit(X_train, y_train)
     model = classifier.fit(X_train, y_train)
-    score = f1_score(y_test, classifier.predict(X_test), pos_label=1)
     
+    X1= test_data.drop(labels='Label_Default',axis=1)
+    
+    result = model.predict(X1)
+    result_proba = model.predict_proba(X1)[:,1]
+    
+    new_frame = []
+    new_frame = pd.DataFrame(new_frame)
+    new_frame['LoanID']= test_data.iloc[:,0]
+    new_frame['Predictions']= result_proba
+    
+    counter=0
+    c=0
+    for i in result:
+        if i=='Y':
+            counter=counter+1
+        else: 
+            c=c+1
+    
+    perc= counter/len(result)*100
+    print("Percentage of default '{perc}'".format(perc=perc))
+    perc1= c/len(result)*100
+    print("Percentage of non-default '{perc}'".format(perc=perc1))
+    
+    print("Probabilities - results")
+    for i in range(len(X1)):
+        print("'{i1}'   '{y}'".format(i1=result[i], y = result_proba[i]))
+    print("New frame")
+    print(new_frame)
+    
+    score = f1_score(y_test, classifier.predict(X_test), pos_label='Y')
     # Generate the P-R curve
-    
     #y_prob = classifier.decision_function(X_test)
     y_prob = classifier.predict_proba(X_test)
     y_pred = model.predict(X_test)
-    precision, recall, _ = precision_recall_curve(y_test, y_prob[:,1], pos_label=1)
+    precision, recall, _ = precision_recall_curve(y_test, y_prob[:,1], pos_label='Y')
     # Include the score in the title
     yield 'Random forest (F1 score={:.3f})'.format(score), precision, recall
     # Generate the ROC curve for random forest
-    fpr_rt_lm, tpr_rt_lm, _ = roc_curve(y_test, y_prob[:,1], pos_label=1)
+    fpr_rt_lm, tpr_rt_lm, _ = roc_curve(y_test, y_prob[:,1], pos_label='Y')
     auc = roc_auc_score(y_test, y_prob[:,1])
     print('Random forest AUC: %.3f' % auc)
     print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
     plt.figure(1)
     plt.plot([0, 1], [0, 1], 'k--')
     plt.plot(fpr_rt_lm, tpr_rt_lm, label='Random Forest RT + LR')
-   
+    #plt.plot(fpr_rf, tpr_rf, label='RF')
+    #plt.plot(fpr_rf_lm, tpr_rf_lm, label='RF + LR')
+    #plt.plot(fpr_grd, tpr_grd, label='GBT')
+    #plt.plot(fpr_grd_lm, tpr_grd_lm, label='GBT + LR')
+    #yield 'Random forest ROC'.format(score), precision, recall
     plt.xlabel('False positive rate')
     plt.ylabel('True positive rate')
     plt.title('ROC curve')
     plt.legend(loc='best')
 
-    # testing the Ada boost classifier (another type of classifier, similar to AUC)
+
+
+    # Test the Ada boost classifier
     classifier = AdaBoostClassifier(n_estimators=50, learning_rate=1.0, algorithm='SAMME.R')
-   
+    # Fit the classifier
     model = classifier.fit(X_train, y_train)
-    score = f1_score(y_test, classifier.predict(X_test), pos_label=1)
-    # P-R curve
+    score = f1_score(y_test, classifier.predict(X_test), pos_label='Y')
+    # Generate the P-R curve
     y_prob = classifier.decision_function(X_test)
+    print(y_prob)
     y_pred = model.predict(X_test)
-    #final= train_data
-   # for i in final:
-    #    if i!= ID_name:
-   #         final.drop([i], axis=1, inplace= True)
-    #final['Predictions']= y_pred
-    #print("Final")
-    #print(final)
-    
-    precision, recall, _ = precision_recall_curve(y_test, y_prob, pos_label=1)
-    # generating the ROC curve for Ada metric
-    fpr_rt_lm, tpr_rt_lm, _ = roc_curve(y_test, y_prob, pos_label=1)
+    precision, recall, _ = precision_recall_curve(y_test, y_prob, pos_label='Y')
+    # Generate the ROC curve for Ada
+    fpr_rt_lm, tpr_rt_lm, _ = roc_curve(y_test, y_prob, pos_label='Y')
     auc = roc_auc_score(y_test, y_prob)
     print('Ada boost AUC: %.3f' % auc)
-    
-    # including the score in the title
+    # Include the score in the title
     yield 'Ada Boost (F1 score={:.3f})'.format(score), precision, recall
     print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
     plt.figure(1)
     plt.plot([0, 1], [0, 1], 'k--')
     plt.plot(fpr_rt_lm, tpr_rt_lm, label='Ada boost RT + LR')
-    
-    
+    #plt.plot(fpr_rf, tpr_rf, label='RF')
+    #plt.plot(fpr_rf_lm, tpr_rf_lm, label='RF + LR')
+    #plt.plot(fpr_grd, tpr_grd, label='GBT')
+    #plt.plot(fpr_grd_lm, tpr_grd_lm, label='GBT + LR')
+    #yield 'Ada boost ROC'.format(score), precision, recall
     plt.xlabel('False positive rate')
     plt.ylabel('True positive rate')
     plt.title('ROC curve')
     plt.legend(loc='best')
+
 
     
     #==============================================
           
 def plot(results):
 
-    # plot the precision-recall curves
+    # Plot the precision-recall curves
 
     fig = plt.figure(figsize=(6, 6))
     fig.canvas.set_window_title('Classifying data from ')
@@ -175,32 +225,16 @@ def plot(results):
     plt.ylabel('Recall')
     plt.legend(loc='lower left')
 
-    #improving layout with matplotlib
+    # Let matplotlib improve the layout
     plt.tight_layout()
+
 
 
     # ==================================
     # Display the plot in interactive UI
     plt.show()
-
-    # To save the plot to an image file, use savefig()
-    #plt.savefig('plot.png')
-
-    # Open the image file with the default image viewer
-    #import subprocess
-    #subprocess.Popen('plot.png', shell=True)
-
-    # To save the plot to an image in memory, use BytesIO and savefig()
-    # This can then be written to any stream-like object, such as a
-    # file or HTTP response.
-    #from io import BytesIO
-    #img_stream = BytesIO()
-    #plt.savefig(img_stream, fmt='png')
-    #img_bytes = img_stream.getvalue()
-    #print('Image is {} bytes - {!r}'.format(len(img_bytes), img_bytes[:8] + b'...'))
-
-    # Closing the figure allows matplotlib to release the memory used.
     plt.close()
+
 
 # =====================================================================
 if __name__ == '__main__':
@@ -208,34 +242,35 @@ if __name__ == '__main__':
     #connecting to files
     train_data = pd.read_excel(r"C:\Users\Pigi\Desktop\Erasmus Semester Lessons\Data Mining\Project Assignment -AXA\Data_DSC2019_STUDENTS\DSC2019_Training.xlsx",  sheet_name='Sheet1')
     test_data= pd.read_excel(r"C:\Users\Pigi\Desktop\Erasmus Semester Lessons\Data Mining\Project Assignment -AXA\Data_DSC2019_STUDENTS\DSC2019_Test.xlsx",  sheet_name='Sheet1')
-            
+         
     target_name= train_data.columns[-1]
     #encoding the test and train set
+    
     train_data= encoding(train_data)
     test_data= encoding(test_data)
+    X2= test_data.drop(labels='Label_Default',axis=1)
     
-   
-    train_data[target_name]= np.where(train_data[target_name]== 'Y', 1, 0)
-    print("target column: '{i}'".format(i=train_data[target_name]))
 
+    #train_data[target_name]= np.where(train_data[target_name]== 'Y', 1, 0)
+    print("target column: '{i}'".format(i=train_data[target_name]))
     
+
     #print(train_data)
-   
+        
+    #fix undersampling of 
+    #from imblearn.over_sampling import SMOTE 
+    #sm = SMOTE(random_state=12) 
     #separating the train and the test data
-    Y= train_data[target_name].values
-    X= train_data.drop(labels=target_name,axis=1)
-    print(X.shape)
-    print(Y.shape)
-    print(X)
-      
-    #I tried to make a validation set but the AUC went down, I will try again
-    '''X_train, X_test, y_train, y_test = train_test_split(
-    X, Y, test_size=0.2, random_state=1)
-    X_train, X_val, y_train, y_val = train_test_split(
-    X_train, y_train, test_size=0.25, random_state=1)'''
-    #X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.5, random_state=101)
-    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=1)
-    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25, random_state=1)
+    #Y1= train_data['Label_Default'].values
+    #X1= train_data.drop(labels='Label_Default',axis=1)
+    #tune sample start
+    #X, Y = sm.fit_sample(X1, Y1)
+    
+     #separating the train and the test data
+    Y= train_data['Label_Default'].values
+    X= train_data.drop(labels='Label_Default',axis=1)
+   
+    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=101)
     print(X_train.shape)
     print(y_train.shape)
     print(X_train)
@@ -243,13 +278,14 @@ if __name__ == '__main__':
     print(X_test.shape)
     print(y_test.shape)
     print(X_test)
+    
 
+    
     # Evaluate my_trainultiple classifiers on the data
     print("Evaluating classifiers")
     results = list(evaluate_classifier(X_train, X_test, y_train, y_test))
+    print(results)
+    
     # Display the results
     print("Plotting the results")
     plot(results)
-    
-    #transferring to excel sheet 
-    #I WILL FINISH WITH THIS TODAY
