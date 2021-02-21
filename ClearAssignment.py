@@ -17,12 +17,12 @@ from sklearn.impute import SimpleImputer
 
 def encoding(df):
 
-    #seperating the name of the target variable and the LoanID variable
+    #Seperate the name of the target variable and the LoanID variable
     ID_name= df.columns[0]
     target_name= df.columns[-1]
 
         
-   #searching for all categorical columns ('object') and adding them to a list
+   #Search for all categorical columns and add them to a list
     
     categorical_cols= []
     for i in df:
@@ -34,7 +34,7 @@ def encoding(df):
         unique= len(train_data[col_name].unique())
         print("'{i}' has '{u}' unique categories".format(i=col_name, u=unique))
      
-    #imputing the most frequent value to missing values of the categorical columns
+    #Impute the most frequent value to missing values of the categorical columns
     imp2 = SimpleImputer(strategy="most_frequent")
     df[categorical_cols]=imp2.fit_transform(df[categorical_cols])
     
@@ -50,7 +50,7 @@ def encoding(df):
     
       
    
-    #creating a list with all the numerical columns 
+    #Create a list with all the numerical columns 
     numerical_cols= list(df.columns)
     for i in df.columns:
         if i in categorical_cols:
@@ -60,12 +60,12 @@ def encoding(df):
         if i== ID_name:
             numerical_cols.remove(i)   
 
-    #imputing the mean to missing values of the numerical columns
+    #Impute the mean to missing values of the numerical columns
     imp1 = SimpleImputer(strategy="mean")
     df[numerical_cols]=imp1.fit_transform(df[numerical_cols])  
        
      
-    #normalizing all numerical data
+    #Normalize all numerical data
     for col in df: 
         for i in numerical_cols:
             if i==col:
@@ -76,19 +76,20 @@ def encoding(df):
             if i==col:
                 df[i]= (df[i]- df[i].min())/(df[i].max()- df[i].min())
     
-    print('df[cat_columns]')
-    print(df[cat_columns])
    
-    # create correlation matrix
+   
+    #Create correlation matrix
     corr_matrix = df.corr().abs()
-    # select upper triangle of correlation matrix
+    
+    #Select upper triangle of correlation matrix
     upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
-    # Find index of feature columns with correlation greater than 0.95
+    
+    #Find index of feature columns with correlation greater than 0.95
     to_drop = [column for column in upper.columns if any(upper[column] > 0.95)]
     print("High correlation columns")
     print(to_drop)
-    # Drop features 
-    #df.drop(df[to_drop], axis=1)
+    
+
     rs = np.random.RandomState(0)
     corr_df = pd.DataFrame(rs.rand(10, 10))
     correlation = corr_df.corr()
@@ -97,25 +98,16 @@ def encoding(df):
     return df
 
 def evaluate_classifier(X_train, X_test, y_train, y_test):
-
-
-#Import some classifiers to test from sklearn.svm 
     
-    #from sklearn.svm import LinearSVC, NuSVC
     from sklearn.ensemble import AdaBoostClassifier
     from sklearn.ensemble import RandomForestClassifier
 
-    # We will calculate the P-R curve for each classifier
     from sklearn.metrics import precision_recall_curve, f1_score, roc_curve, roc_auc_score
     from sklearn import metrics
 
-    
-    # Here we create classifiers with default parameters. These need
-    # to be adjusted to obtain optimal performance on your data set.
 
     # Test the random forest classifier
     classifier = RandomForestClassifier(n_estimators=1000)
-    # Fit the classifier
     classifier.fit(X_train, y_train)
     model = classifier.fit(X_train, y_train)
     
@@ -149,13 +141,15 @@ def evaluate_classifier(X_train, X_test, y_train, y_test):
     print(new_frame)
     
     score = f1_score(y_test, classifier.predict(X_test), pos_label='Y')
+    
     # Generate the P-R curve
-    #y_prob = classifier.decision_function(X_test)
     y_prob = classifier.predict_proba(X_test)
     y_pred = model.predict(X_test)
     precision, recall, _ = precision_recall_curve(y_test, y_prob[:,1], pos_label='Y')
+    
     # Include the score in the title
     yield 'Random forest (F1 score={:.3f})'.format(score), precision, recall
+    
     # Generate the ROC curve for random forest
     fpr_rt_lm, tpr_rt_lm, _ = roc_curve(y_test, y_prob[:,1], pos_label='Y')
     auc = roc_auc_score(y_test, y_prob[:,1])
@@ -164,43 +158,35 @@ def evaluate_classifier(X_train, X_test, y_train, y_test):
     plt.figure(1)
     plt.plot([0, 1], [0, 1], 'k--')
     plt.plot(fpr_rt_lm, tpr_rt_lm, label='Random Forest RT + LR')
-    #plt.plot(fpr_rf, tpr_rf, label='RF')
-    #plt.plot(fpr_rf_lm, tpr_rf_lm, label='RF + LR')
-    #plt.plot(fpr_grd, tpr_grd, label='GBT')
-    #plt.plot(fpr_grd_lm, tpr_grd_lm, label='GBT + LR')
-    #yield 'Random forest ROC'.format(score), precision, recall
+  
     plt.xlabel('False positive rate')
     plt.ylabel('True positive rate')
     plt.title('ROC curve')
     plt.legend(loc='best')
 
 
-
     # Test the Ada boost classifier
     classifier = AdaBoostClassifier(n_estimators=50, learning_rate=1.0, algorithm='SAMME.R')
-    # Fit the classifier
     model = classifier.fit(X_train, y_train)
     score = f1_score(y_test, classifier.predict(X_test), pos_label='Y')
+    
     # Generate the P-R curve
     y_prob = classifier.decision_function(X_test)
     print(y_prob)
     y_pred = model.predict(X_test)
     precision, recall, _ = precision_recall_curve(y_test, y_prob, pos_label='Y')
+    
     # Generate the ROC curve for Ada
     fpr_rt_lm, tpr_rt_lm, _ = roc_curve(y_test, y_prob, pos_label='Y')
     auc = roc_auc_score(y_test, y_prob)
     print('Ada boost AUC: %.3f' % auc)
-    # Include the score in the title
+
     yield 'Ada Boost (F1 score={:.3f})'.format(score), precision, recall
     print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
     plt.figure(1)
     plt.plot([0, 1], [0, 1], 'k--')
     plt.plot(fpr_rt_lm, tpr_rt_lm, label='Ada boost RT + LR')
-    #plt.plot(fpr_rf, tpr_rf, label='RF')
-    #plt.plot(fpr_rf_lm, tpr_rf_lm, label='RF + LR')
-    #plt.plot(fpr_grd, tpr_grd, label='GBT')
-    #plt.plot(fpr_grd_lm, tpr_grd_lm, label='GBT + LR')
-    #yield 'Ada boost ROC'.format(score), precision, recall
+   
     plt.xlabel('False positive rate')
     plt.ylabel('True positive rate')
     plt.title('ROC curve')
@@ -225,13 +211,8 @@ def plot(results):
     plt.ylabel('Recall')
     plt.legend(loc='lower left')
 
-    # Let matplotlib improve the layout
     plt.tight_layout()
 
-
-
-    # ==================================
-    # Display the plot in interactive UI
     plt.show()
     plt.close()
 
@@ -239,49 +220,28 @@ def plot(results):
 # =====================================================================
 if __name__ == '__main__':
 
-    #connecting to files
     train_data = pd.read_excel(r"C:\Users\Pigi\Desktop\Erasmus Semester Lessons\Data Mining\Project Assignment -AXA\Data_DSC2019_STUDENTS\DSC2019_Training.xlsx",  sheet_name='Sheet1')
     test_data= pd.read_excel(r"C:\Users\Pigi\Desktop\Erasmus Semester Lessons\Data Mining\Project Assignment -AXA\Data_DSC2019_STUDENTS\DSC2019_Test.xlsx",  sheet_name='Sheet1')
          
     target_name= train_data.columns[-1]
-    #encoding the test and train set
     
+    #Encode the test and train set
     train_data= encoding(train_data)
     test_data= encoding(test_data)
     X2= test_data.drop(labels='Label_Default',axis=1)
     
 
-    #train_data[target_name]= np.where(train_data[target_name]== 'Y', 1, 0)
     print("target column: '{i}'".format(i=train_data[target_name]))
-    
 
-    #print(train_data)
-        
-    #fix undersampling of 
-    #from imblearn.over_sampling import SMOTE 
-    #sm = SMOTE(random_state=12) 
-    #separating the train and the test data
-    #Y1= train_data['Label_Default'].values
-    #X1= train_data.drop(labels='Label_Default',axis=1)
-    #tune sample start
-    #X, Y = sm.fit_sample(X1, Y1)
     
-     #separating the train and the test data
+    #Separate the train and the test data
     Y= train_data['Label_Default'].values
     X= train_data.drop(labels='Label_Default',axis=1)
    
     X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=101)
-    print(X_train.shape)
-    print(y_train.shape)
-    print(X_train)
+  
     
-    print(X_test.shape)
-    print(y_test.shape)
-    print(X_test)
-    
-
-    
-    # Evaluate my_trainultiple classifiers on the data
+    # Evaluate classifiers on the data
     print("Evaluating classifiers")
     results = list(evaluate_classifier(X_train, X_test, y_train, y_test))
     print(results)
